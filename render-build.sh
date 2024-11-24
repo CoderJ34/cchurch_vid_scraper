@@ -11,7 +11,7 @@ apt-get install -y wget curl
 wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
 dpkg -i google-chrome-stable_current_amd64.deb
 apt --fix-broken install
-
+apt-get install chromium
 
 # Install Python dependencies
 pip install -r requirements.txt
