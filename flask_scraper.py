@@ -1,11 +1,6 @@
-from flask import Flask, jsonify
 import os
 from requests_html import HTMLSession
 
-# Initialize Flask app
-app = Flask(__name__)
-
-@app.route('/scrape-audio', methods=['GET'])
 def scrape_audio():
     try:
         # Create a session using requests-html
@@ -40,15 +35,18 @@ def scrape_audio():
                     with open(file_name, 'wb') as file:
                         file.write(response.content)
                     downloaded_files.append(file_name)
+                    print(f"Downloaded: {file_name}")
                 else:
                     print(f"Failed to download {audio_url}")
 
-        # Return the list of downloaded files as JSON
-        return jsonify({"status": "success", "downloaded_files": downloaded_files})
+        # Output the list of downloaded files
+        print("\nDownload Summary:")
+        for file in downloaded_files:
+            print(file)
 
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        print(f"An error occurred: {e}")
 
-# Run the Flask app
+# Run the script
 if __name__ == '__main__':
-    app.run(debug=True)
+    scrape_audio()
