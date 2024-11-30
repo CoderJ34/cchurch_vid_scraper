@@ -14,7 +14,7 @@ def scrape_audio(num_pages):
             new_scraping_url = f"https://carlislechurch.org/sermons/page/{i}/"
             scraping_urls.append(new_scraping_url)
         for cur_scraping_url in scraping_urls:
-            response = session.get(url)
+            response = session.get(cur_scraping_url)
 
         # Render JavaScript (if necessary)
             response.html.render()
