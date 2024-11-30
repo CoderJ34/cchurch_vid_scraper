@@ -19,9 +19,9 @@ def scrape_audio(num_pages):
 
         # Loop through all pages
         for cur_scraping_url in scraping_urls:
-            response = session.get(cur_scraping_url)
+            response = session.get(cur_scraping_url, timeout=1000)
             # Render JavaScript (if necessary)
-            response.html.render()
+            response.html.render(timeout=1000)
 
             # Find all audio elements with the class 'wp-audio-shortcode'
             audio_elements = response.html.find('audio.wp-audio-shortcode')
