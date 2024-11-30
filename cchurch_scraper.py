@@ -3,7 +3,7 @@ from requests_html import HTMLSession
 
 app = Flask(__name__)
 
-def scrape_audio():
+def scrape_audio(num_pages):
     try:
         # Create a session using requests-html
         session = HTMLSession()
