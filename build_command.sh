@@ -15,5 +15,3 @@ else
 fi
 
 # Install Playwright browser binaries
-pip uninstall websockets
-pip install websockets
