@@ -1,50 +1,44 @@
 from flask import Flask, jsonify, request
 from requests_html import HTMLSession
-import threading
-import time
 
 app = Flask(__name__)
 
-def fetch_page(session, url, audio_files, lock):
+def scrape_audio(num_pages):
     try:
-        response = session.get(url, timeout=10)  # Set timeout for each page
-        try:
-            # Render JavaScript if needed
-            response.html.render(timeout=20, sleep=1)
-        except Exception as e:
-            print(f"Rendering failed for {url}: {e}")
+        # Create a session using requests-html
+        session = HTMLSession()
+        all_audio_files = []  # Collect all audio files from all pages
 
-        # Find audio elements
-        audio_elements = response.html.find('audio.wp-audio-shortcode')
-        with lock:  # Use a lock to safely append to shared list
+        # Base URL for the site
+        base_url = "https://carlislechurch.org/sermons"
+
+        # Loop through the specified number of pages
+        for page_num in range(1, num_pages + 1):
+            # Construct URL for each page
+            url = f"{base_url}/page/{page_num}/" if page_num > 1 else base_url
+            response = session.get(url, timeout=10)  # Set a timeout for the request
+
+            try:
+                # Render JavaScript only if necessary
+                response.html.render(timeout=20, sleep=1)
+            except Exception as e:
+                print(f"Rendering failed for {url}: {e}")
+                continue
+
+            # Debug: Log fetched HTML (optional, remove in production)
+            print(f"Fetched HTML for {url}:\n{response.html.html[:500]}")  # Log first 500 characters
+
+            # Find all audio elements (adjust selector as needed)
+            audio_elements = response.html.find('audio')  # General selector for <audio> tags
             for audio in audio_elements:
                 audio_src = audio.attrs.get('src')
                 if audio_src and ".mp3" in audio_src:
+                    # Normalize the audio URL
                     audio_url = audio_src if audio_src.startswith('http') else f'https://carlislechurch.org{audio_src}'
-                    audio_files.append(audio_url)
-    except Exception as e:
-        print(f"Error fetching {url}: {e}")
+                    all_audio_files.append(audio_url)
 
-def scrape_audio(num_pages):
-    try:
-        session = HTMLSession()
-        base_url = "https://carlislechurch.org/sermons"
-        audio_files = []
-        lock = threading.Lock()  # Lock for thread safety
-
-        threads = []
-        for i in range(1, num_pages + 1):
-            url = f"{base_url}/page/{i}/" if i > 1 else base_url
-            thread = threading.Thread(target=fetch_page, args=(session, url, audio_files, lock))
-            threads.append(thread)
-            thread.start()
-
-        # Wait for all threads to complete
-        for thread in threads:
-            thread.join()
-
-        session.close()  # Properly close the session
-        return {"audio_files": audio_files}
+        session.close()  # Always close the session
+        return {"audio_files": all_audio_files}
 
     except Exception as e:
         return {"status": "error", "message": str(e)}
@@ -53,6 +47,7 @@ def scrape_audio(num_pages):
 def scrape_audio_endpoint():
     """API endpoint to scrape audio files."""
     if request.method == "GET":
+        # Get number of pages to scrape from query parameter 'pages'
         num_pages_to_scrape = request.args.get("pages", default=1, type=int)
         if num_pages_to_scrape < 1:
             return jsonify({"status": "error", "message": "Invalid number of pages."}), 400
@@ -61,4 +56,5 @@ def scrape_audio_endpoint():
         return jsonify(result)
 
 if __name__ == '__main__':
+    # Run the Flask app
     app.run(debug=True)
