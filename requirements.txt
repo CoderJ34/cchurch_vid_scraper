@@ -2,3 +2,4 @@ lxml_html_clean
 requests-html
 flask
 gunicorn
+asyncio
