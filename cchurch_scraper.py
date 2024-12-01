@@ -1,30 +1,30 @@
 from flask import Flask, jsonify, request
-from requests_html import HTMLSession
-import threading
+from requests_html import AsyncHTMLSession
 import asyncio
+import threading
 
 app = Flask(__name__)
 
 async def scrape_audio_for_pages_async(pages_to_scrape, all_audio_files):
     """Async function to scrape audio for a list of pages."""
-    try:
-        session = HTMLSession()  # Create a session using requests-html
+    session = AsyncHTMLSession()  # Use AsyncHTMLSession for async requests
 
-        for page in pages_to_scrape:
-            response = session.get(page)
-            await response.html.arender()  # Use arender (async version of render)
+    tasks = []
+    for page in pages_to_scrape:
+        tasks.append(session.get(page))  # Schedule all page requests
 
-            # Find all audio elements with the class 'wp-audio-shortcode'
-            audio_elements = response.html.find('audio.wp-audio-shortcode')
+    responses = await asyncio.gather(*tasks)  # Wait for all requests to complete
 
-            # Extract and normalize the audio URLs
-            for audio in audio_elements:
-                audio_src = audio.attrs.get('src')
-                if audio_src and ".mp3" in audio_src:
-                    audio_url = audio_src if audio_src.startswith('http') else f'https://carlislechurch.org{audio_src}'
-                    all_audio_files.append(audio_url)
-    except Exception as e:
-        print(f"Error scraping pages {pages_to_scrape}: {e}")
+    for response in responses:
+        await response.html.arender()  # Render JavaScript asynchronously
+        audio_elements = response.html.find('audio.wp-audio-shortcode')
+
+        # Extract and normalize the audio URLs
+        for audio in audio_elements:
+            audio_src = audio.attrs.get('src')
+            if audio_src and ".mp3" in audio_src:
+                audio_url = audio_src if audio_src.startswith('http') else f'https://carlislechurch.org{audio_src}'
+                all_audio_files.append(audio_url)
 
 def scrape_audio_for_pages(pages_to_scrape, all_audio_files):
     """Wrapper to run the async function in a thread."""
@@ -74,4 +74,3 @@ def scrape_audio_endpoint():
 if __name__ == '__main__':
     # Run the Flask app
     app.run(debug=True)
-    
