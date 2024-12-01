@@ -1,17 +1,18 @@
 from flask import Flask, jsonify, request
 from requests_html import HTMLSession
 import threading
+import asyncio
 
 app = Flask(__name__)
 
-def scrape_audio_for_pages(pages_to_scrape, all_audio_files):
+async def scrape_audio_for_pages_async(pages_to_scrape, all_audio_files):
+    """Async function to scrape audio for a list of pages."""
     try:
         session = HTMLSession()  # Create a session using requests-html
 
-        # Loop through the pages and scrape the audio files
         for page in pages_to_scrape:
             response = session.get(page)
-            response.html.render()
+            await response.html.arender()  # Use arender (async version of render)
 
             # Find all audio elements with the class 'wp-audio-shortcode'
             audio_elements = response.html.find('audio.wp-audio-shortcode')
@@ -24,6 +25,10 @@ def scrape_audio_for_pages(pages_to_scrape, all_audio_files):
                     all_audio_files.append(audio_url)
     except Exception as e:
         print(f"Error scraping pages {pages_to_scrape}: {e}")
+
+def scrape_audio_for_pages(pages_to_scrape, all_audio_files):
+    """Wrapper to run the async function in a thread."""
+    asyncio.run(scrape_audio_for_pages_async(pages_to_scrape, all_audio_files))
 
 def scrape_audio(num_pages):
     try:
@@ -69,3 +74,4 @@ def scrape_audio_endpoint():
 if __name__ == '__main__':
     # Run the Flask app
     app.run(debug=True)
+    
