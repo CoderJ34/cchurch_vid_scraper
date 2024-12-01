@@ -1,8 +1,11 @@
 from flask import Flask, jsonify, request
 from playwright.async_api import async_playwright
+from concurrent.futures import ThreadPoolExecutor
 import asyncio
 
 app = Flask(__name__)
+
+executor = ThreadPoolExecutor()  # ThreadPoolExecutor for running threads
 
 async def scrape_audio_for_pages(pages_to_scrape):
     """Scrape audio files from multiple pages using Playwright."""
@@ -30,7 +33,20 @@ async def scrape_audio_for_pages(pages_to_scrape):
 async def scrape_audio(num_pages):
     """Scrape audio files across multiple pages."""
     urls = [f"https://carlislechurch.org/sermons/page/{i}/" for i in range(1, num_pages + 1)]
-    return await scrape_audio_for_pages(urls)
+
+    # Divide the URLs into chunks for threading
+    chunk_size = 5  # Number of URLs per thread
+    chunks = [urls[i:i + chunk_size] for i in range(0, len(urls), chunk_size)]
+
+    loop = asyncio.get_event_loop()
+    tasks = [
+        loop.run_in_executor(executor, asyncio.run, scrape_audio_for_pages(chunk))
+        for chunk in chunks
+    ]
+
+    results = await asyncio.gather(*tasks)
+    all_audio_files = [url for result in results for url in result]  # Flatten the results
+    return all_audio_files
 
 @app.route('/scrape-audio', methods=['GET'])
 async def scrape_audio_endpoint():
