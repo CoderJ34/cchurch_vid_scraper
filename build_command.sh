@@ -15,7 +15,5 @@ else
 fi
 
 # Install Playwright browser binaries
-echo "Installing Playwright browser binaries..."
-playwright install
-
-echo "Build process completed successfully!"
+pip uninstall websockets
+pip install websockets
