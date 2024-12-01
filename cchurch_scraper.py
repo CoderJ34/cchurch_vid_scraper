@@ -1,59 +1,53 @@
 from flask import Flask, jsonify, request
-from playwright.async_api import async_playwright
-from concurrent.futures import ThreadPoolExecutor
-import asyncio
+from requests_html import HTMLSession
 
 app = Flask(__name__)
 
-executor = ThreadPoolExecutor()  # ThreadPoolExecutor for running threads
+def scrape_audio(num_pages):
+    try:
+        # Use a single session
+        session = HTMLSession()
+        all_audio_files = []
+        base_url = "https://carlislechurch.org/sermons"
 
-async def scrape_audio_for_pages(pages_to_scrape):
-    """Scrape audio files from multiple pages using Playwright."""
-    all_audio_files = []
+        # Loop through pages with a single session
+        for i in range(1, num_pages + 1):
+            url = f"{base_url}/page/{i}/" if i > 1 else base_url
+            response = session.get(url, timeout=10)  # Set timeout
+            try:
+                # Render JavaScript only if needed
+                response.html.render(timeout=20, sleep=2)  
+            except Exception as render_error:
+                print(f"Render failed for {url}: {render_error}")
+                continue
 
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
-        context = await browser.new_context()
-        page = await context.new_page()
-
-        for url in pages_to_scrape:
-            await page.goto(url)
-            audio_elements = await page.query_selector_all('audio.wp-audio-shortcode')
-
+            # Find audio elements
+            audio_elements = response.html.find('audio.wp-audio-shortcode')
             for audio in audio_elements:
-                audio_src = await audio.get_attribute('src')
+                audio_src = audio.attrs.get('src')
                 if audio_src and ".mp3" in audio_src:
+                    # Normalize the URL
                     audio_url = audio_src if audio_src.startswith('http') else f'https://carlislechurch.org{audio_src}'
                     all_audio_files.append(audio_url)
 
-        await browser.close()
+        session.close()  # Always close the session
+        return {"audio_files": all_audio_files}
 
-    return all_audio_files
-
-async def scrape_audio(num_pages):
-    """Scrape audio files across multiple pages."""
-    urls = [f"https://carlislechurch.org/sermons/page/{i}/" for i in range(1, num_pages + 1)]
-
-    # Divide the URLs into chunks for threading
-    chunk_size = 5  # Number of URLs per thread
-    chunks = [urls[i:i + chunk_size] for i in range(0, len(urls), chunk_size)]
-
-    loop = asyncio.get_event_loop()
-    tasks = [
-        loop.run_in_executor(executor, asyncio.run, scrape_audio_for_pages(chunk))
-        for chunk in chunks
-    ]
-
-    results = await asyncio.gather(*tasks)
-    all_audio_files = [url for result in results for url in result]  # Flatten the results
-    return all_audio_files
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
 @app.route('/scrape-audio', methods=['GET'])
-async def scrape_audio_endpoint():
+def scrape_audio_endpoint():
     """API endpoint to scrape audio files."""
-    num_pages = request.args.get("pages", default=1, type=int)
-    audio_files = await scrape_audio(num_pages)
-    return jsonify({"audio_files": audio_files})
+    if request.method == "GET":
+        # Get the number of pages from query parameters
+        num_pages_to_scrape = request.args.get("pages", default=1, type=int)
+        if num_pages_to_scrape < 1:
+            return jsonify({"status": "error", "message": "Invalid number of pages."}), 400
+
+        result = scrape_audio(num_pages_to_scrape)
+        return jsonify(result)
 
 if __name__ == '__main__':
+    # Run the Flask app
     app.run(debug=True)
